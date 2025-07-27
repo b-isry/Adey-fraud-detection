@@ -1,71 +1,57 @@
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import precision_recall_curve, auc, f1_score, confusion_matrix
+from sklearn.metrics import (
+    f1_score,
+    precision_recall_curve,
+    auc,
+    confusion_matrix,
+    ConfusionMatrixDisplay
+)
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-from preprocess import preprocess_pipeline
+def split_data(X, y):
+    """Splits data into training and testing sets, stratified by the target variable."""
+    return train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-
-def prepare_data(fraud_path, ip_path):
-    # Preprocess data using the pipeline from Task 1
-    X, y, encoder, scaler, _ = preprocess_pipeline(fraud_path, ip_path)
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    return X_train, X_test, y_train, y_test
-
-def train_and_evaluate_model(model, model_name, X_train, X_test, y_train, y_test):
-    # Train the model
+def train_logistic_regression(X_train, y_train):
+    """Trains a Logistic Regression model."""
+    model = LogisticRegression(random_state=42, max_iter=1000)
     model.fit(X_train, y_train)
-    # Predict probabilities for AUC-PR
-    y_scores = model.predict_proba(X_test)[:, 1]
-    # Compute AUC-PR
-    precision, recall, _ = precision_recall_curve(y_test, y_scores)
-    auc_pr = auc(recall, precision)
-    # Compute F1-Score
+    return model
+
+def train_random_forest(X_train, y_train):
+    """Trains a Random Forest Classifier."""
+    # class_weight='balanced' can be an alternative or complement to SMOTE
+    model = RandomForestClassifier(random_state=42, n_estimators=100, class_weight='balanced')
+    model.fit(X_train, y_train)
+    return model
+
+def evaluate_model(model, X_test, y_test, model_name="Model"):
+    """
+    Evaluates the model using F1-score, AUC-PR, and Confusion Matrix.
+    Returns a dictionary of the metrics.
+    """
+    # Get predictions
     y_pred = model.predict(X_test)
+    y_pred_proba = model.predict_proba(X_test)[:, 1]
+
+    # Calculate metrics
     f1 = f1_score(y_test, y_pred)
-    # Compute Confusion Matrix
-    cm = confusion_matrix(y_test, y_pred)
+    precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
+    auc_pr = auc(recall, precision)
+
+    print(f"--- Evaluation Metrics for {model_name} ---")
+    print(f"F1-Score: {f1:.4f}")
+    print(f"AUC-PR (Area Under Precision-Recall Curve): {auc_pr:.4f}")
+    print("\nConfusion Matrix:")
+
     # Plot Confusion Matrix
-    plt.figure(figsize=(6, 4))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title(f'Confusion Matrix - {model_name}')
-    plt.ylabel('True Label')
-    plt.xlabel('Predicted Label')
-    plt.savefig(f'confusion_matrix_{model_name.lower().replace(" ", "_")}.png')
-    plt.close()
-    return auc_pr, f1, cm
+    cm = confusion_matrix(y_test, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title(f"Confusion Matrix - {model_name}")
+    plt.show()
 
-def main():
-    # Paths to datasets
-    fraud_path = "./data/Fraud_Data.csv"
-    ip_path = "./data/IpAddress_to_Country.csv"
-    
-    # Prepare data
-    X_train, X_test, y_train, y_test = prepare_data(fraud_path, ip_path)
-    
-    # Initialize models
-    log_reg = LogisticRegression(random_state=42, max_iter=1000)
-    rf = RandomForestClassifier(random_state=42, n_estimators=100)
-    
-    # Train and evaluate Logistic Regression
-    auc_pr_lr, f1_lr, cm_lr = train_and_evaluate_model(log_reg, "Logistic Regression", X_train, X_test, y_train, y_test)
-    print(f"Logistic Regression - AUC-PR: {auc_pr_lr:.4f}, F1-Score: {f1_lr:.4f}")
-    print("Confusion Matrix:\n", cm_lr)
-    
-    # Train and evaluate Random Forest
-    auc_pr_rf, f1_rf, cm_rf = train_and_evaluate_model(rf, "Random Forest", X_train, X_test, y_train, y_test)
-    print(f"Random Forest - AUC-PR: {auc_pr_rf:.4f}, F1-Score: {f1_rf:.4f}")
-    print("Confusion Matrix:\n", cm_rf)
-    
-    # Model selection justification
-    best_model = "Random Forest" if auc_pr_rf > auc_pr_lr else "Logistic Regression"
-    print(f"\nBest Model: {best_model}")
-    print("Justification: The chosen model has higher AUC-PR, indicating better performance in handling the imbalanced dataset, which is critical for fraud detection. Random Forest is typically more robust due to its ensemble nature, capturing complex patterns, while Logistic Regression offers interpretability for business stakeholders.")
-
-if __name__ == "__main__":
-    main()
+    return {"f1_score": f1, "auc_pr": auc_pr}
