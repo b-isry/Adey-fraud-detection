@@ -1,0 +1,42 @@
+# Fraud Detection System Configuration
+
+model:
+  algorithm: "random_forest"
+  random_state: 42
+  test_size: 0.2
+  validation_size: 0.1
+  n_estimators: 100
+  max_depth: 10
+  min_samples_split: 2
+  min_samples_leaf: 1
+  threshold: 0.5
+
+data:
+  input_path: "data/raw/"
+  processed_path: "data/processed/"
+  features_path: "data/features/"
+  target_column: "fraud"
+  categorical_columns: []
+  numerical_columns: []
+  drop_columns: []
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  workers: 1
+  timeout: 30
+  rate_limit: 100
+
+dashboard:
+  host: "0.0.0.0"
+  port: 8501
+  debug: false
+  theme: "light"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: "logs/fraud_detection.log"
+  max_bytes: 10485760
+  backup_count: 5 
